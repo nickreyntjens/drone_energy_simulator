@@ -1,0 +1,28 @@
+{
+    "num_days": 4,
+    "initial_insect_count": 1000,
+    "daily_inflow_count": 200,
+    "environment": {
+        "field_width": 1000.0,
+        "field_height": 1000.0,
+        "poisson_decay": 0.05,
+        "docking_station": [500.0, 500.0],
+        "active_start": "09:00",
+        "active_end": "18:00",
+        "hidden_probability": 0.05
+    },
+    "drone": {
+        "max_acc": 1.0,
+        "max_speed": 5.0,
+        "energy_consumption": 300.0,
+        "battery_mAh": 6700.0,
+        "num_cells": 3,
+        "laser_shot_energy": 1.0,
+        "low_battery_threshold_fraction": 0.33,
+        "max_speed_when_shooting_kmh": 3.0,
+        "battery_cost": 200.0,
+        "battery_max_cycles": 500.0,
+        "laser_shot_time": 1.0
+    }
+}
+
