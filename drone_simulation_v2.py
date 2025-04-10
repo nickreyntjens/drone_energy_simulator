@@ -648,7 +648,7 @@ def main():
             "battery_max_cycles": BATTERY_MAX_CYCLES,
             "solar_panel_energy_per_hour": 720000.0
         }
-        visualize_simulation(simulation_history, remaining_insects, charging_station, drone.path,
+        visualize_simulation(simulation_history, insects, charging_station, drone.path,
                              field_width, field_height, extra_info)
 
 if __name__ == '__main__':
