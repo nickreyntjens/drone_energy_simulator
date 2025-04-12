@@ -24,7 +24,7 @@ The end goal is to perform multi‑day simulations and then use scenario sweeps 
 
 ---
 
-Note that when equiping a sprays drone with one or more an optical units, the spray drone may at times use its laser, or at times use its liquid to combat the targeted pests. For spray drones to do dynamic flow rates, and determine where to spray, an insect density map of the field must be made anyway, so when can assume that the locations of the insects are known in the simulation.
+Note that when equiping a sprays drone with one or more an optical units, the spray drone may at times use its laser, or at times use its liquid to combat the targeted pests. For example, it makes little sence to spray a hole set of plants, for only 1 insect. For spray drones to do dynamic flow rates, and determine where to spray, an insect density map of the field must be made anyway, so when can assume that the locations of the insects are known in the simulation.
 
 ## 2. Tools Overview
 
