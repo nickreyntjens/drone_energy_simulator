@@ -1,7 +1,3 @@
-Below is a comprehensive, cleaned‑up specification report describing the overall simulation suite. The report details what each tool is supposed to do, the input/output file formats (with current default values), and notes the option to run the one‑day simulation with or without a GUI. This document is written so that both a human reader and an AI code generator can use it as a blueprint for development and further discussion.
-
----
-
 # Simulation Suite Specification Report
 
 ## 1. Introduction
@@ -27,6 +23,8 @@ This simulation suite models the operation and performance of an insect‑huntin
 The end goal is to perform multi‑day simulations and then use scenario sweeps (varying parameters like drone speed, insect density decay, daily insect inflow, etc.) to analyze cost per hectare and other cost metrics (e.g., battery depreciation cost per hectare).
 
 ---
+
+Note that when equiping a sprays drone with one or more an optical units, the spray drone may at times use its laser, or at times use its liquid to combat the targeted pests. For example, it makes little sence to spray a hole set of plants, for only 1 insect. For spray drones to do dynamic flow rates, and determine where to spray, an insect density map of the field must be made anyway, so when can assume that the locations of the insects are known in the simulation.
 
 ## 2. Tools Overview
 
