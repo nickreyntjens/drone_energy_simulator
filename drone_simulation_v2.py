@@ -69,6 +69,40 @@ def nearest_neighbor_tsp_fast(start, targets):
         current = np.array(route[-1]["position"])
     return route
 
+def get_insect_subset_by_grid(insects, field_width, field_height, nrows, ncols):
+    """
+    Divide the field into a grid with nrows and ncols.
+    Map each insect to its grid cell, count insects per cell,
+    and then return all insects in the cell with highest count plus its neighbors.
+    """
+    row_height = field_height / nrows
+    col_width = field_width / ncols
+    cell_counts = {}
+    cell_insects = {}
+    for insect in insects:
+        x, y = insect["position"]
+        row = int(y // row_height)
+        col = int(x // col_width)
+        row = min(row, nrows - 1)
+        col = min(col, ncols - 1)
+        key = (row, col)
+        cell_counts[key] = cell_counts.get(key, 0) + 1
+        cell_insects.setdefault(key, []).append(insect)
+    # Find the cell with the highest count.
+    best_cell = max(cell_counts, key=cell_counts.get)
+    # Include neighbors (cells sharing a side or corner, including the best cell).
+    neighbors = []
+    for dr in [-1, 0, 1]:
+        for dc in [-1, 0, 1]:
+            nr = best_cell[0] + dr
+            nc = best_cell[1] + dc
+            if 0 <= nr < nrows and 0 <= nc < ncols:
+                neighbors.append((nr, nc))
+    subset = []
+    for cell in neighbors:
+        subset.extend(cell_insects.get(cell, []))
+    return subset
+
 # ----------------------- Drone Class -----------------------
 
 class Drone:
@@ -83,13 +117,13 @@ class Drone:
         self.energy_consumption = energy_consumption  # in J/s
         self.laser_shot_energy = laser_shot_energy      # in Joules per shot
         self.low_battery_threshold = low_battery_threshold
-        self.total_energy_used = 0.0  # cumulative energy usage (J)
-        self.total_time = 0.0         # total simulation time (seconds)
+        self.total_energy_used = 0.0
+        self.total_time = 0.0
         self.path = [self.position.copy()]
-        self.log = []               # log simulation events
-        self.total_recharge_time = 0.0  # seconds spent recharging
-        self.recharge_count = 0         # count of recharges
-        self.insects_killed_count = 0   # count of insects successfully shot
+        self.log = []
+        self.total_recharge_time = 0.0
+        self.recharge_count = 0
+        self.insects_killed_count = 0
 
     def update(self, acceleration, dt):
         self.velocity += acceleration * dt
@@ -98,7 +132,6 @@ class Drone:
             self.velocity = (self.velocity / speed) * self.max_speed
         self.position += self.velocity * dt
         self.path.append(self.position.copy())
-        # Consume flight energy:
         energy_used = self.energy_consumption * dt
         self.battery -= energy_used
         self.total_energy_used += energy_used
@@ -123,13 +156,10 @@ def simulate(drone, insects, charging_station, field_width, field_height,
              max_speed_when_shooting, active_period_end,
              use_fast_tsp=False, hidden_probability=0.05):
     """
-    Simulate one day of the drone mission using the nearest-neighbor TSP approach.
-      - Recalculates the TSP route using NN (or fast variant).
-      - Diverts to the charging station when battery is low.
-      - When within engagement range, an insect is either shot or marked hidden
-        (with probability 'hidden_probability').
-      - The simulation stops once the active period (in seconds) is reached.
-
+    Simulate one day of the drone mission.
+    The simulation uses a nearest-neighbor TSP route.
+    When there are many insects, it clusters them by grid before computing the route.
+    
     Returns:
         simulation_history: List of simulation log entries.
         log: List of event messages.
@@ -151,17 +181,35 @@ def simulate(drone, insects, charging_station, field_width, field_height,
             break
 
         if not route:
-            if use_fast_tsp:
-                route = nearest_neighbor_tsp_fast(drone.position, remaining_insects)
+            # If there are many insects, choose a subset via grid clustering.
+            if len(remaining_insects) > 1000:
+                if len(remaining_insects) > 10000:
+                    nrows, ncols = 10, 10  # 100 cells for very large populations
+                else:
+                    nrows, ncols = 2, 5   # 10 cells for moderately large populations
+
+                subset = get_insect_subset_by_grid(remaining_insects, field_width, field_height, nrows, ncols)
+                if not subset:  # Fallback if subset is empty
+                    subset = remaining_insects
+                print(f"Using grid-based TSP on subset of {len(subset)} insects "
+                      f"(from {len(remaining_insects)} total).")
+                if use_fast_tsp:
+                    route = nearest_neighbor_tsp_fast(drone.position, subset)
+                else:
+                    route = nearest_neighbor_tsp(drone.position, subset)
             else:
-                route = nearest_neighbor_tsp(drone.position, remaining_insects)
+                # Otherwise, use standard TSP.
+                if use_fast_tsp:
+                    route = nearest_neighbor_tsp_fast(drone.position, remaining_insects)
+                else:
+                    route = nearest_neighbor_tsp(drone.position, remaining_insects)
             drone.log.append(f"Recalculated route with {len(route)} targets at t={drone.total_time:.2f}s")
-            print(f"Recalculating route: {len(route)} targets remaining.")
+            print(f"Recalculating route: {len(route)} targets selected.")
 
         target = route[0]
         target_pos = np.array(target["position"])
 
-        # If battery is low, override target with the charging station.
+        # Battery check: if battery is low, override target with charging station.
         if drone.battery < drone.low_battery_threshold:
             target = {"position": charging_station.tolist(), "hidden": False}
             target_pos = charging_station
@@ -178,7 +226,7 @@ def simulate(drone, insects, charging_station, field_width, field_height,
                 break
 
             acc = drone.apply_acceleration_towards(target_pos, dt)
-            current_speed = np.linalg.norm(drone.velocity) * 3.6  # km/h conversion
+            current_speed = np.linalg.norm(drone.velocity) * 3.6  # km/h
             current_acc = np.linalg.norm(acc)
             drone.update(acc, dt)
             simulation_history.append({
@@ -194,7 +242,7 @@ def simulate(drone, insects, charging_station, field_width, field_height,
                 'acceleration': current_acc
             })
 
-            # Keep drone within field boundaries.
+            # Ensure drone remains within field bounds.
             drone.position[0] = min(max(drone.position[0], 0), field_width)
             drone.position[1] = min(max(drone.position[1], 0), field_height)
 
@@ -228,7 +276,7 @@ def simulate(drone, insects, charging_station, field_width, field_height,
                     break
 
             else:
-                # When within engagement range:
+                # Engagement: if within engagement range.
                 if distance(drone.position, target_pos) <= engagement_range:
                     if not target["hidden"]:
                         if np.random.rand() < hidden_probability:
@@ -237,7 +285,6 @@ def simulate(drone, insects, charging_station, field_width, field_height,
                             print(f"Insect at {target['position']} became hidden at t={drone.total_time:.2f}s.")
                             reached = True
                             route.pop(0)
-                            # Do not remove from remaining_insects so it carries over.
                             break
                         else:
                             while np.linalg.norm(drone.velocity) > max_speed_when_shooting:
@@ -409,7 +456,7 @@ def main():
                         help="Run simulation using default parameters (auto mode)")
     args = parser.parse_args()
 
-    # Load simulation state from load or input file, or use auto mode (default values)
+    # Load simulation state from load or input file, or use auto mode.
     if args.load:
         with open(args.load, "r") as f:
             saved_state = json.load(f)
@@ -420,7 +467,6 @@ def main():
         insects = state.get("insect_population", [])
         for insect in insects:
             insect["hidden"] = False
-
     elif args.input:
         with open(args.input, "r") as f:
             input_data = json.load(f)
@@ -438,9 +484,7 @@ def main():
         insects = state.get("insect_population", [])
         for insect in insects:
             insect["hidden"] = False
-
     elif args.auto:
-        # Use default parameters in auto mode.
         day = 1
         environment = {
             "field_width": 1000.0,
@@ -482,9 +526,7 @@ def main():
                 environment["poisson_decay"],
                 seed=42)
         insects = state["insect_population"]
-
     else:
-        # Otherwise, use interactive prompts.
         print("----- Drone Simulation Setup -----")
         field_width = float(input("Enter field width in meters (e.g., 1000): ") or 1000)
         field_height = float(input("Enter field height in meters (e.g., 1000): ") or 1000)
@@ -503,7 +545,6 @@ def main():
         laser_shot_energy = float(input("Laser shot energy (J, e.g., 1.0): ") or 1.0)
         low_battery_fraction = float(input("Low battery threshold fraction (0.33): ") or 0.33)
         max_speed_shooting_kmh = float(input("Max speed shooting (km/h, e.g., 3.0): ") or 3.0)
-
         day = 1
         environment = {
             "field_width": field_width,
@@ -541,7 +582,6 @@ def main():
             state["insect_population"] = generate_insects(field_width, field_height, base_rate, decay_rate, seed=42)
         insects = state["insect_population"]
 
-    # Extract environment & drone parameters.
     field_width = environment["field_width"]
     field_height = environment["field_height"]
     charging_station = np.array(environment["docking_station"])
@@ -611,7 +651,6 @@ def main():
         "energy_used": energy_used,
         "battery_depreciation": battery_depreciation
     }
-    # Here we update the state to use only the remaining insects.
     new_state = {
         "insect_population": remaining_insects,
         "cumulative_battery_depreciation": state.get("cumulative_battery_depreciation", 0.0) + battery_depreciation,
@@ -648,6 +687,7 @@ def main():
             "battery_max_cycles": BATTERY_MAX_CYCLES,
             "solar_panel_energy_per_hour": 720000.0
         }
+        # Note: The visualization now uses the full initial insect set.
         visualize_simulation(simulation_history, insects, charging_station, drone.path,
                              field_width, field_height, extra_info)
 
