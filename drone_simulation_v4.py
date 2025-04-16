@@ -609,8 +609,8 @@ def drone_config_window(event):
     
     slider_max_acc = Slider(ax1, 'Max Acc', 0.5, 2.0, valinit=drone_params['max_acc'])
     slider_max_speed = Slider(ax2, 'Max Speed', 3.0, 10.0, valinit=drone_params['max_speed'])
-    slider_energy = Slider(ax3, 'Energy Cons.', 100, 1000, valinit=drone_params['energy_consumption'])
-    slider_battery = Slider(ax4, 'Battery (mAh)', 3000, 10000, valinit=drone_params['battery_mAh'])
+    slider_energy = Slider(ax3, 'Energy Cons.', 30, 1000, valinit=drone_params['energy_consumption'])
+    slider_battery = Slider(ax4, 'Battery (mAh)', 3000, 100000, valinit=drone_params['battery_mAh'])
     slider_shot_energy = Slider(ax5, 'Laser Energy', 0.5, 5.0, valinit=drone_params['laser_shot_energy'])
     slider_low_batt = Slider(ax6, 'Low Batt Frac', 0.1, 0.5, valinit=drone_params['low_battery_threshold_fraction'])
     slider_lock_time = Slider(ax7, 'Lock Time (s)', 0.5, 5.0, valinit=drone_params['lock_time'])
@@ -737,7 +737,7 @@ def run_simulation_callback(event):
         fig.canvas.draw_idle()
     
     BATTERY_VOLTAGE = drone_params['num_cells'] * 3.7
-    BATTERY_CAPACITY = (drone_params['battery_mAh'] / 1000) * BATTERY_VOLTAGE * 3600
+    BATTERY_CAPACITY = (drone_params['battery_mAh'] / 1000) * BATTERY_VOLTAGE * 3600 # In Joules 
     LOW_BATTERY_THRESHOLD = BATTERY_CAPACITY * drone_params['low_battery_threshold_fraction']
     
     drone = Drone(
