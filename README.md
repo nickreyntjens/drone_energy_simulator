@@ -6,6 +6,14 @@ Below is an extended guide that not only explains how to install Python, set up 
 
 This guide explains how to set up and run the simulation, describes each simulation step, and provides an in-depth look at the underlying modeling techniques.
 
+# Screenshots
+
+![screenshot1](screenshot1.png)
+
+![screenshot2](screenshot2.png)
+
+
+
 ---
 
 ## 1. Environment Setup
