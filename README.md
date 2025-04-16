@@ -14,7 +14,7 @@ We can see the drone is on his way back to the recharge station:
 We can see how many insects the drone killing in a 9 hour window (with the current settings):
 ![screenshot2](screenshot2.png)
 
-[Video tool overview](https://www.youtube.com/watch?v=hrJzrAwy-MY)
+[Watch Video](https://www.youtube.com/watch?v=hrJzrAwy-MY)
 ---
 
 ## 1. Environment Setup
