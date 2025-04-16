@@ -576,18 +576,35 @@ def insects_config_window(event):
     btn_apply.on_clicked(apply_insect_settings)
     plt.show(block=True)
 
+drone_params = {
+    'max_acc': 1.0,
+    'max_speed': 5.0,
+    'energy_consumption': 300.0,
+    'battery_mAh': 6700.0,
+    'num_cells': 3,
+    'laser_shot_energy': 1.0,
+    'low_battery_threshold_fraction': 0.33,
+    'max_speed_when_shooting_kmh': 3.0,
+    'lock_time': 1.0,           # seconds to lock on target
+    'engagement_range': 2.0,    # engagement distance (m)
+    'num_lasers': 2             # number of lasers operating concurrently
+}
+
 def drone_config_window(event):
-    fig_drone = plt.figure("Drone Configuration Settings", figsize=(7, 9))
-    ax1 = fig_drone.add_axes([0.15, 0.88, 0.7, 0.05])
-    ax2 = fig_drone.add_axes([0.15, 0.78, 0.7, 0.05])
-    ax3 = fig_drone.add_axes([0.15, 0.68, 0.7, 0.05])
-    ax4 = fig_drone.add_axes([0.15, 0.58, 0.7, 0.05])
-    ax5 = fig_drone.add_axes([0.15, 0.48, 0.7, 0.05])
-    ax6 = fig_drone.add_axes([0.15, 0.38, 0.7, 0.05])
-    ax7 = fig_drone.add_axes([0.15, 0.28, 0.7, 0.05])
-    ax8 = fig_drone.add_axes([0.15, 0.18, 0.7, 0.05])
-    ax9 = fig_drone.add_axes([0.15, 0.08, 0.7, 0.05])
+    # Increase the figure height to accommodate the extra slider.
+    fig_drone = plt.figure("Drone Configuration Settings", figsize=(7, 10))
     
+    ax1 = fig_drone.add_axes([0.15, 0.88, 0.7, 0.05])  # Max Acceleration
+    ax2 = fig_drone.add_axes([0.15, 0.78, 0.7, 0.05])  # Max Speed
+    ax3 = fig_drone.add_axes([0.15, 0.68, 0.7, 0.05])  # Energy Consumption
+    ax4 = fig_drone.add_axes([0.15, 0.58, 0.7, 0.05])  # Battery (mAh)
+    ax5 = fig_drone.add_axes([0.15, 0.48, 0.7, 0.05])  # Laser Energy
+    ax6 = fig_drone.add_axes([0.15, 0.38, 0.7, 0.05])  # Low Battery Fraction
+    ax7 = fig_drone.add_axes([0.15, 0.28, 0.7, 0.05])  # Lock Time (s)
+    ax8 = fig_drone.add_axes([0.15, 0.18, 0.7, 0.05])  # Engagement Range (m)
+    ax9 = fig_drone.add_axes([0.15, 0.08, 0.7, 0.05])  # Num Lasers
+    ax10 = fig_drone.add_axes([0.15, 0.0, 0.7, 0.05])   # Num Cells (new slider)
+
     slider_max_acc = Slider(ax1, 'Max Acc', 0.5, 2.0, valinit=drone_params['max_acc'])
     slider_max_speed = Slider(ax2, 'Max Speed', 3.0, 10.0, valinit=drone_params['max_speed'])
     slider_energy = Slider(ax3, 'Energy Cons.', 30, 1000, valinit=drone_params['energy_consumption'])
@@ -597,10 +614,11 @@ def drone_config_window(event):
     slider_lock_time = Slider(ax7, 'Lock Time (s)', 0.5, 5.0, valinit=drone_params['lock_time'])
     slider_engagement = Slider(ax8, 'Eng. Range (m)', 1.0, 20.0, valinit=drone_params['engagement_range'])
     slider_num_lasers = Slider(ax9, 'Num Lasers', 1, 10, valinit=drone_params['num_lasers'], valfmt='%d')
-    
+    slider_num_cells = Slider(ax10, 'Num Cells', 1, 10, valinit=drone_params['num_cells'], valfmt='%d')
+
     ax_apply = fig_drone.add_axes([0.70, 0.94, 0.25, 0.05])
     btn_apply = Button(ax_apply, "Apply")
-    
+
     def apply_drone_settings(event):
         print("Drone Config Apply button clicked.")
         drone_params['max_acc'] = slider_max_acc.val
@@ -612,12 +630,14 @@ def drone_config_window(event):
         drone_params['lock_time'] = slider_lock_time.val
         drone_params['engagement_range'] = slider_engagement.val
         drone_params['num_lasers'] = int(slider_num_lasers.val)
+        drone_params['num_cells'] = int(slider_num_cells.val)  # new configuration for num_cells
         print("Updated drone_params:", drone_params)
         plt.close(fig_drone)
         fig.canvas.draw()
-    
+   
     btn_apply.on_clicked(apply_drone_settings)
     plt.show(block=True)
+
 
 def show_config_report(event):
     config_fig = plt.figure("Configuration Report", figsize=(8, 6))
