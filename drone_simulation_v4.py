@@ -497,25 +497,6 @@ def run_simulation_callback(event):
         drone_path_line.set_data(drone_path_arr[:, 0], drone_path_arr[:, 1])
     fig.canvas.draw_idle()
 
-# ----------------------- Main Button Panel -----------------------
-
-ax_btn_insects = fig.add_axes([0.05, 0.05, 0.13, 0.05])
-btn_insects = Button(ax_btn_insects, "Gen Insects")
-
-ax_btn_drone = fig.add_axes([0.19, 0.05, 0.13, 0.05])
-btn_drone = Button(ax_btn_drone, "Config Drone")
-
-ax_btn_sim = fig.add_axes([0.33, 0.05, 0.13, 0.05])
-btn_sim = Button(ax_btn_sim, "Sim Params")
-
-ax_btn_run = fig.add_axes([0.47, 0.05, 0.13, 0.05])
-btn_run = Button(ax_btn_run, "Run Sim")
-
-ax_btn_help = fig.add_axes([0.61, 0.05, 0.13, 0.05])
-btn_help = Button(ax_btn_help, "Help")
-
-ax_btn_config = fig.add_axes([0.75, 0.05, 0.13, 0.05])
-btn_config = Button(ax_btn_config, "Config Report")
 
 # ----------------------- Configuration Windows -----------------------
 # (These windows remain mostly unchanged.)
