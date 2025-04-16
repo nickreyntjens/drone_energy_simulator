@@ -8,10 +8,11 @@ This guide explains how to set up and run the simulation, describes each simulat
 
 # Screenshots
 
+We can see the drone is on his way back to the recharge station:
 ![screenshot1](screenshot1.png)
 
+We can see how many insects the drone killing in a 9 hour window (with the current settings):
 ![screenshot2](screenshot2.png)
-
 
 
 ---
