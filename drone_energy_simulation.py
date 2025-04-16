@@ -630,15 +630,15 @@ def drone_config_window(event):
     ax10 = fig_drone.add_axes([0.15, 0.18, 0.7, 0.05])  # Num Lasers
     ax11 = fig_drone.add_axes([0.15, 0.10, 0.7, 0.05])  # Num Cells
 
-    slider_max_acc = Slider(ax1, 'Max Acc', 0.5, 2.0, valinit=drone_params['max_acc'])
-    slider_max_speed = Slider(ax2, 'Max Speed', 3.0, 10.0, valinit=drone_params['max_speed'])
+    slider_max_acc = Slider(ax1, 'Max Acc', 0.5, 30.0, valinit=drone_params['max_acc'])
+    slider_max_speed = Slider(ax2, 'Max Speed', 3.0, 100.0, valinit=drone_params['max_speed'])
     slider_energy = Slider(ax3, 'Energy Cons.', 30, 1000, valinit=drone_params['energy_consumption'])
     slider_battery = Slider(ax4, 'Battery (mAh)', 3000, 100000, valinit=drone_params['battery_mAh'])
     slider_shot_energy = Slider(ax5, 'Laser Energy', 0.5, 5.0, valinit=drone_params['laser_shot_energy'])
-    slider_low_batt = Slider(ax6, 'Low Batt Frac', 0.1, 0.5, valinit=drone_params['low_battery_threshold_fraction'])
-    slider_lock_time = Slider(ax7, 'Lock Time (s)', 0.5, 5.0, valinit=drone_params['lock_time'])
-    slider_engagement = Slider(ax8, 'Eng. Range (m)', 1.0, 20.0, valinit=drone_params['engagement_range'])
-    slider_max_lock_speed = Slider(ax9, 'Max Lock Speed (km/h)', 1.0, 10.0, valinit=drone_params.get('max_speed_when_shooting_kmh', 3.0))
+    slider_low_batt = Slider(ax6, 'Low Batt Frac', 0.05, 0.5, valinit=drone_params['low_battery_threshold_fraction'])
+    slider_lock_time = Slider(ax7, 'Lock Time (s)', 0.1, 5.0, valinit=drone_params['lock_time'])
+    slider_engagement = Slider(ax8, 'Eng. Range (m)', 0.5, 20.0, valinit=drone_params['engagement_range'])
+    slider_max_lock_speed = Slider(ax9, 'Max Lock Speed (km/h)', 0.01, 10.0, valinit=drone_params.get('max_speed_when_shooting_kmh', 3.0))
     slider_num_lasers = Slider(ax10, 'Num Lasers', 1, 10, valinit=drone_params['num_lasers'], valfmt='%d')
     slider_num_cells = Slider(ax11, 'Num Cells', 1, 10, valinit=drone_params['num_cells'], valfmt='%d')
 
