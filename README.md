@@ -1,279 +1,197 @@
-# Simulation Suite Specification Report
-
-## 1. Introduction
-
-This simulation suite models the operation and performance of an insect‑hunting drone over multiple days. The simulation is designed to incorporate realistic features, including:
-
-- **Drone Behavior:**  
-  The drone uses continuous kinematics and a laser weapon to hunt insects while consuming energy and managing its battery. Its performance is affected by acceleration, speed, and a requirement that it must slow down (below a maximum speed) in order to effectively shoot.
-
-- **Field Environment:**  
-  Insects are distributed in a field according to a spatial Poisson process whose local density decays exponentially from the field edges. In addition, insects may sometimes be hidden (with a 5% chance) when the drone arrives at their location—thus they remain unengaged and are carried over to the next day.
-
-- **Day/Night Cycle:**  
-  The drone is active only during the daytime (from 09:00 to 18:00) when sunlight is sufficient; outside this window, it docks at a charging station.  
-  If the drone is fully charged and the active period has ended, it remains docked until the next day’s hunting period begins.
-
-- **Daily Inflows:**  
-  Each day, new insects are added to the field (the “daily inflow”), while any insects that were not killed (including hidden ones) carry over to the next day.
-
-- **Output Metrics:**  
-  Throughout the simulation, key performance metrics (such as insects killed, flight time, recharge count, energy used, and battery depreciation) are tracked.
-
-The end goal is to perform multi‑day simulations and then use scenario sweeps (varying parameters like drone speed, insect density decay, daily insect inflow, etc.) to analyze cost per hectare and other cost metrics (e.g., battery depreciation cost per hectare).
+Below is an extended guide that not only explains how to install Python, set up dependencies, and run the code, but also dives into additional details about how the simulation uses a TSP-like algorithm (and strategies to split insects into manageable batches) as well as the “physical” modeling aspects—how the drone accelerates toward targets and adjusts its movement.
 
 ---
 
-Note that when equiping a sprays drone with one or more an optical units, the spray drone may at times use its laser, or at times use its liquid to combat the targeted pests. For example, it makes little sence to spray a hole set of plants, for only 1 insect. For spray drones to do dynamic flow rates, and determine where to spray, an insect density map of the field must be made anyway, so when can assume that the locations of the insects are known in the simulation.
+# Drone Simulation Guide
 
-## 2. Tools Overview
-
-### A. One-Day Simulation (`drone_simulation_one_day.py`)
-
-**Purpose:**  
-This module simulates one day of drone operation. It reads an input file containing:
-- The current day’s settings (environment, drone parameters, and state carried over from previous days), and  
-- The insect population (represented as a list of insect objects, each with a position and a “hidden” flag).
-
-It then simulates the active (hunting) period, including:
-- The drone’s hunting actions (engaging insects with proper deceleration before shooting),  
-- Recharging events (when the battery falls below a set threshold), and  
-- The day/night idle period (when the drone remains docked at the charging station).
-
-**GUI/No-GUI Option:**  
-- The one‑day simulation module can run **with a GUI** to visually verify the drone’s behavior (showing a plot, a slider to scrub through time, and real‑time performance metrics).  
-- Alternatively, it can run **without a GUI** (batch mode) to facilitate automated simulations and scenario sweeps where visual output is not required.
-
-**Output:**  
-The one‑day simulation produces a JSON output file (e.g., `one_day_output.json`) that includes a daily summary of metrics (insects killed, flight time, recharge count, energy used, battery depreciation, etc.) and an updated “state” (the remaining insect population and cumulative performance metrics) that will serve as the input for the next day.
+This guide explains how to set up and run the simulation, describes each simulation step, and provides an in-depth look at the underlying modeling techniques.
 
 ---
 
-### B. Multi‑Day Runner (`multi_day_runner.py`)
+## 1. Environment Setup
 
-**Purpose:**  
-The multi‑day runner acts as a driver that calls the one‑day simulation repeatedly for a specified number of days (default is 20). It performs the following tasks:
-1. Reads an initial configuration file (e.g., `multi_day_config.json`) that defines global simulation parameters and the initial state.
-2. For each day:
-   - Generates an input file for the day (using the previous day’s output as the new “state” and adding daily insect inflow).
-   - Runs the one‑day simulation (either in GUI mode for visual verification during development or in no‑GUI mode for batch processing).
-   - Stores the output in a dedicated file (e.g., `day_01_output.json`, `day_02_output.json`, …).
-3. Aggregates all daily outputs into a final CSV file (e.g., `daily_results.csv`) that summarizes key metrics per day.
-
----
-
-### C. Scenario Runner (`scenario_runner.py`)
-
-**Purpose:**  
-The scenario runner automates multi‑day simulations across different sets of parameters. It:
-1. Reads a list of scenarios (provided as a CSV or JSON file where each scenario specifies parameter values like max speed, poisson decay, daily insect inflow, maximum speed when shooting, etc.).
-2. For each scenario, invokes the multi‑day runner and collects the results.
-3. Produces a final aggregated CSV file (e.g., `scenario_results.csv`) where each row represents one scenario’s overall summary (e.g., average insects killed, total flight time, total battery depreciation, cost per hectare, etc.), which can be imported into Google Sheets for further analysis and visualization.
-
----
-
-## 3. Input/Output Formats
-
-### A. One-Day Simulation
-
-#### Input File (`one_day_input.json`)
-```json
-{
-  "day": 1,
-  "environment": {
-    "field_width": 1000.0,
-    "field_height": 1000.0,
-    "poisson_decay": 0.05,
-    "active_start": "09:00",
-    "active_end": "18:00",
-    "initial_insect_count": 1000,
-    "daily_inflow": 200
-  },
-  "drone": {
-    "max_acc": 1.0,
-    "max_speed": 5.0,
-    "energy_consumption": 300.0,
-    "battery_mAh": 6700.0,
-    "num_cells": 3,
-    "laser_shot_energy": 1.0,
-    "low_battery_threshold_fraction": 0.33,
-    "max_speed_when_shooting_kmh": 3.0
-  },
-  "state": {
-    "insect_population": [
-      {"position": [123.0, 456.0], "hidden": false},
-      {"position": [789.0, 654.0], "hidden": false}
-    ],
-    "cumulative_battery_depreciation": 0.0,
-    "cumulative_flight_time_sec": 0.0,
-    "cumulative_energy_used": 0.0,
-    "cumulative_recharge_count": 0,
-    "cumulative_recharge_time_sec": 0.0
-  }
-}
-```
-
-#### Output File (`one_day_output.json`)
-```json
-{
-  "day": 1,
-  "results": {
-    "insects_killed": 350,
-    "flight_time_sec": 16200,
-    "recharge_count": 3,
-    "total_recharge_time_sec": 5400,
-    "energy_used": 2450000,
-    "battery_depreciation": 4.0
-  },
-  "state": {
-    "insect_population": [
-      {"position": [x3, y3], "hidden": false},
-      {"position": [x7, y7], "hidden": false}
-    ],
-    "cumulative_battery_depreciation": 4.0,
-    "cumulative_flight_time_sec": 16200,
-    "cumulative_energy_used": 2450000,
-    "cumulative_recharge_count": 3,
-    "cumulative_recharge_time_sec": 5400
-  }
-}
-```
-*Note:* Insects that are hidden (5% chance) remain in the population with their `"hidden"` flag set. At the start of each day, all insects are reset to `"hidden": false`.
-
----
-
-### B. Multi-Day Runner
-
-#### Input File (`multi_day_config.json`)
-```json
-{
-  "num_days": 20,
-  "initial_insect_count": 1000,
-  "daily_inflow_count": 200,
-  "environment": {
-    "field_width": 1000.0,
-    "field_height": 1000.0,
-    "poisson_decay": 0.05,
-    "docking_station": [500.0, 500.0]
-  },
-  "drone": {
-    "max_acc": 1.0,
-    "max_speed": 5.0,
-    "energy_consumption": 300.0,
-    "battery_mAh": 6700.0,
-    "num_cells": 3,
-    "low_battery_threshold_fraction": 0.33,
-    "laser_shot_energy": 1.0,
-    "laser_shot_time": 1.0,
-    "max_speed_when_shooting_kmh": 3.0
-  }
-}
-```
-
-#### Output Files
-- **Daily Files:**  
-  Each day produces a file (e.g., `day_01_output.json`, `day_02_output.json`, …) with the one‑day output format.
-- **Aggregate Output:**  
-  After all days are processed, the multi‑day runner aggregates key metrics from each day into a CSV file (`daily_results.csv`) with columns such as:
+### 1.1. Installing Python
+- **Download Python:**  
+  Visit the [Python official website](https://www.python.org/downloads/) and download the latest Python version (Python 3.8 or later is recommended).
   
-  ```
-  Day,Insects Killed,Flight Time (h),Recharges,Recharge Time (h),Energy Used (J),Battery Depreciation (USD)
-  1,350,4.5,3,1.5,2450000,4.0
-  2,320,4.3,2,1.0,2300000,3.0
-  …
-  ```
+- **Install Python:**  
+  Run the installer on your system. **On Windows, be sure to select “Add Python to PATH”** when installing.
+
+### 1.2. Installing Dependencies
+The simulation requires these Python packages:
+- **NumPy** for numerical operations.
+- **Matplotlib** for plotting and GUI widgets (sliders, buttons).
+
+**Installation Command:**
+Open your terminal (or command prompt) and run:
+
+```bash
+pip install numpy matplotlib
+```
+
+This command will install all necessary packages for your simulation.
 
 ---
 
-### C. Scenario Runner
+## 2. Running the Simulation Code
 
-#### Input Scenarios File (CSV Example: `scenarios.csv`)
-```
-scenario_id,max_speed,poisson_decay,daily_inflow_count,max_speed_when_shooting_kmh
-A,5.0,0.05,200,3.0
-B,5.0,0.04,250,3.5
-C,4.5,0.05,200,3.0
+### 2.1. Saving the Code
+1. **Copy the Full Code:**  
+   Copy the entire simulation code into a text editor.
+2. **Save the File:**  
+   Save the file with a name such as `drone_simulation.py`.
+
+### 2.2. Executing the Code
+Run the simulation from the terminal:
+
+```bash
+python drone_simulation.py
 ```
 
-#### Output File (`scenario_results.csv`)
-This CSV aggregates each scenario’s overall simulation metrics, with rows such as:
-```
-Scenario ID,Avg. Insects Killed,Total Flight Time (h),Total Recharges,Total Battery Depreciation (USD),Total Energy Used (J),Cost per Hectare (USD)
-A,320,85.3,2.8,15.2,23000000,12.5
-B,340,80.1,3.0,17.0,21000000,13.0
-C,315,83.0,2.7,14.0,22500000,12.0
-```
+When executed, the script opens a graphical user interface (GUI) window with a plotting area, buttons, and sliders.
 
 ---
 
-## 4. Default Parameter Values
+## 3. Simulation Workflow
 
-Below are the default values currently used in auto mode:
+The simulation GUI is designed to let you interact with several steps. The workflow mainly follows these steps:
 
-**Environment:**
-- **Field Width:** 1000.0 m  
-- **Field Height:** 1000.0 m  
-- **Poisson Decay:** 0.05  
-- **Docking Station Location:** [500.0, 500.0]  
-- **Active Period:** 09:00 to 18:00
+### Step 1: Generate Insects
+- **Action via Button:** Click **"Gen Insects"**.  
+- **What It Does:**  
+  - Uses a random process (with a Poisson distribution) to generate insect positions over a specified field.
+  - Insects are positioned based on a base rate, modified by a decay function that reduces insect likelihood near the borders.
+- **Outcome:**  
+  - Red markers representing insects appear within the simulation field.
 
-**Insect Population:**
-- **Initial Insect Count:** 1000  
-- **Daily Inflow Count:** 200
+### Step 2: Configure the Drone
+- **Action via Button:** Click **"Config Drone"**.  
+- **What It Does:**  
+  - Opens a configuration window with sliders to adjust key drone parameters, including:
+    - **Max Acceleration and Max Speed:** Determines how fast the drone can change its velocity.
+    - **Energy Consumption and Battery Capacity:** Controls the available energy.
+    - **Laser Shot Energy:** Energy required per insect engagement.
+    - **Low Battery Threshold:** Battery level at which the drone will return to the charging station.
+    - **Lock Time:** Delay for acquiring a lock on target insects.
+    - **Engagement Range:** Distance at which the drone can engage insects.
+    - **Max Lock Speed (km/h):** Ensures the drone decelerates before locking onto targets.
+    - **Number of Lasers & Battery Cells:** Configurable options affecting power and operation.
+- **Outcome:**  
+  - Parameter values are updated once you click **"Apply"**; the drone will use these settings in subsequent simulation runs.
 
-**Drone Parameters:**
-- **Max Acceleration:** 1.0 m/s²  
-- **Max Speed:** 5.0 m/s  
-- **Energy Consumption:** 300.0 W (300 J/s)  
-- **Battery:**  
-  - **Capacity:** 6700 mAh, 3‑cell LiPo → ~89244 Joules  
-  - **Low Battery Threshold:** 33% of capacity (≈29748 J)  
-- **Laser Shot Energy:** 1.0 J  
-- **Laser Shot Time:** 1.0 second  
-- **Max Speed When Shooting:** 3 km/h (≈0.83 m/s)
+### Step 3: Run the Simulation
+- **Action via Button:** Click **"Run Sim"**.  
+- **What It Does:**  
+  - Initiates the simulation by letting the drone move towards insect targets.
+  - The drone follows a computed route (using a nearest-neighbor TSP approach) and, if necessary, slows down prior to locking onto targets.
+  - The simulation records key flight data (e.g., time, speed, battery status) and plots the drone’s path.
+- **Outcome:**  
+  - A timeline slider and an information box are available to track the simulation progress as the drone moves and engages insects.
 
-**Time Parameters:**
-- **Time Step (dt):** 0.1 s  
-- **Recharge Time:** 1800.0 s (30 minutes per recharge)
-
-**Multi-Day:**
-- **Number of Days:** 20
-
-**Solar Panel:**
-- **Energy per Hour:** 720000 J/h
-
-**Battery Cost:**
-- **Battery Cost:** 200 USD  
-- **Battery Maximum Cycles:** 500
+Additional buttons like **"Sim Params"**, **"Help"**, and **"Config Report"** allow you to adjust time-step parameters, review help information, or see the overall configuration in JSON format.
 
 ---
 
-## 5. Overall Workflow Summary
+## 4. Behind the Scenes: TSP and Insect Batching
 
-1. **One-Day Simulation:**  
-   - **Input:** Reads a JSON file (`one_day_input.json`) with day-specific settings, environmental parameters, drone parameters, and state (including the current insect population and cumulative metrics).  
-   - **Operation:** Simulates the active (hunting) period (09:00–18:00), handling events such as hunting, recharging, and a “hidden” insect mechanism (5% chance that an insect is inaccessible and thus carried over). It can run with a GUI for visual verification of the drone’s path, speed, recharging events, etc., or run headless (no GUI) for batch processing in multi‑day or scenario simulations.  
-   - **Output:** Writes a JSON summary (`one_day_output.json`) that reports daily metrics (insects killed, flight time, recharge count, energy used, battery depreciation) and an updated state (remaining insect population, cumulative data).
+### 4.1. TSP (Traveling Salesman Problem) Overview
+- **The Challenge:**  
+  The simulation must determine the most efficient route for the drone to visit insect locations.
+- **Nearest-Neighbor Heuristic:**  
+  The code implements a nearest-neighbor algorithm:
+  - **Standard TSP Function:**  
+    The function `nearest_neighbor_tsp` starts from the current position and repeatedly selects the closest insect to visit next.
+  - **Optimized Version:**  
+    For a large number of insects, `nearest_neighbor_tsp_fast` uses a similar approach using NumPy arrays for improved performance.
 
-2. **Multi-Day Runner:**  
-   - **Input:** Reads a configuration file (e.g., `multi_day_config.json`) that specifies the number of days, initial insect count, daily inflow, environmental and drone parameters.  
-   - **Operation:** Iterates over the number of days. For each day, it uses the output “state” from the previous day as the input for the next day's simulation and adds the new daily insect inflow.  
-   - **Output:** Writes daily output files (e.g., `day_01_output.json`, …) and produces an aggregated CSV file (`daily_results.csv`) summarizing each day’s performance metrics.
-
-3. **Scenario Runner:**  
-   - **Input:** Reads a list of scenarios (CSV or JSON) where each scenario specifies different values for key parameters (e.g., max drone speed, Poisson decay, daily insect inflow, max speed when shooting, etc.).  
-   - **Operation:** For each scenario, it runs a multi‑day simulation (via the multi‑day runner) and collects a summary of the overall performance.  
-   - **Output:** Produces a final CSV file (`scenario_results.csv`) where each row aggregates the metrics for a scenario (e.g., average insects killed, total flight time, total battery depreciation, cost per hectare). This file can be imported into Google Sheets for further analysis and graphing.
+### 4.2. Splitting Insects into Smaller Batches
+- **Why Split:**  
+  When there are thousands of insects, solving TSP on the complete dataset becomes computationally expensive.
+- **Batching Strategy:**  
+  - **Grid Partitioning:**  
+    The function `get_insect_subset_by_grid` divides the field into a grid of cells.
+  - **Selecting a Subset:**  
+    The grid cell with the highest insect count is identified. Insects in that cell and its immediate neighbors are then grouped into a smaller batch.
+  - **Recalculation:**  
+    The function `recalc_route` either works with the full insect set (if few insects remain) or uses the subset, improving efficiency and keeping the route manageable.
+  
+This grid-based approach allows the simulation to focus on a local group of targets rather than solving for the entire field at once—thus approximating the way a drone might “zoom in” on a hotspot of activity.
 
 ---
 
-## 6. Final Remarks
+## 5. Physical Modeling of Drone Motion
 
-This specification report defines the simulation suite’s modular design, detailing three main components:
-- **One-Day Simulation:** Runs a single day’s events, with both GUI and non-GUI modes.
-- **Multi-Day Runner:** Chains one-day simulations together, carrying state forward and aggregating daily output.
-- **Scenario Runner:** Automates multi‑day simulations over varying parameters for sensitivity analysis.
+The simulation models basic physics to govern the drone’s movement.
 
-The input and output file formats (JSON for simulation detail and CSV for aggregated results) are clearly defined along with default parameter values. This modular, file-based approach facilitates interactive development, debugging, and later batch processing or scenario analysis.
+### 5.1. Accelerating Toward a Target
+- **Applying Acceleration:**  
+  - The method `apply_acceleration_towards` in the **Drone** class computes the desired acceleration by determining the direction to the target.
+  - It calculates a desired velocity based on the drone's maximum speed and then computes the required change in velocity over the time step `dt`.
+  - The computed acceleration is scaled to ensure it does not exceed the drone’s maximum allowable acceleration.
+- **Updating Drone State:**  
+  - The `update` method updates the drone’s velocity and position given the computed acceleration.
+  - It ensures that the drone's speed does not surpass the maximum speed.  
+  - Energy consumption for each time step is also deducted from the battery, using a fixed consumption rate.
 
-Feel free to use this report as the definitive specification when generating code or collaborating further. Let me know if you need additional details or modifications!
+### 5.2. Slowing Down for Target Engagement
+- **Need for Precise Engagement:**  
+  - Before locking onto insects, the drone must decelerate so that its speed falls within a predefined “lock speed” (configured via a slider).
+- **Slowing Down Mechanism:**  
+  - The `slow_down` function continuously applies a braking acceleration (in the direction opposite to the current velocity) until the drone's speed is at or below the target lock speed.
+  - This process is modeled using the same `update` method, ensuring realistic dynamics and simulation continuity.
+
+### 5.3. Engaging Targets
+- **Lock and Shoot:**  
+  - Once within the engagement range and at a safe speed, the drone spends a specified lock time to acquire its target.
+  - After the lock delay, energy is expended for each laser shot, and the engaged insects are removed from the simulation.
+  
+These physical models—using acceleration, deceleration, and energy consumption—provide the simulation with a framework that approximates real-world drone flight in a simplified manner.
+
+---
+
+## 6. Current Simulation Weaknesses
+
+While the simulation integrates many real-world components, there are some simplifications:
+
+### 6.1. Power Consumption
+- **Current Model:**  
+  Energy consumption is implemented as a fixed rate (Joules per second) regardless of the acceleration or speed.
+- **Limitation:**  
+  In actual drones, power draw increases with higher acceleration (greater thrust) and may vary with speed and wind resistance. A more realistic model would tie energy consumption dynamically to the drone’s motion and environmental factors.
+
+### 6.2. Simplified Aerodynamics
+- **Current Model:**  
+  The drone’s motion is governed solely by the applied acceleration toward the target without considering:
+  - Air drag (resistance)
+  - Lift variations or turning penalties.
+- **Limitation:**  
+  More sophisticated models could incorporate drag coefficients and other aerodynamic parameters to simulate the drone’s performance in varied environments.
+
+### 6.3. Battery Dynamics
+- **Current Model:**  
+  The battery is represented by a simple energy capacity and discharges at a steady rate.
+- **Limitation:**  
+  Real batteries have nonlinear discharge characteristics and their performance can degrade over time or with varying loads.
+
+### 6.4. Route Optimization
+- **Current Model:**  
+  The simulation uses a nearest-neighbor heuristic for the TSP.  
+- **Limitation:**  
+  While computationally efficient, this approach may not always yield the most optimal route for visiting insect clusters. More advanced routing strategies (or even iterative improvements) may offer better performance, especially on large-scale problems.
+
+---
+
+## Conclusion
+
+This guide provided step-by-step instructions for setting up your Python environment, installing dependencies, and running the simulation. You learned how to:
+1. **Generate Insects** with the **"Gen Insects"** button.
+2. **Configure the Drone** through the **"Config Drone"** window where you set parameters like acceleration, speed, and max lock speed.
+3. **Run the Simulation** by clicking **"Run Sim"**, where the drone navigates the field, engages insects, and logs its data.
+
+Additionally, the guide explains:
+- **TSP and Insect Batching:** The code uses a nearest-neighbor approach and grid-based subset selection to manage route planning for a large number of targets.
+- **Physical Modeling:** The simulation models drone acceleration, deceleration, and energy consumption in a simplified manner to mimic real-world behavior.
+
+Understanding these components will help you further adjust and refine the simulation to better approximate realistic behavior or to address current weaknesses.
+
+Enjoy experimenting with the code and improving your simulation!
