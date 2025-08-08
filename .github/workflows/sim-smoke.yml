@@ -1,0 +1,20 @@
+name: sim-smoke
+on: [push, pull_request]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: pip install numpy matplotlib pytest
+      - run: python tools/run_headless.py
+      - run: python -m pytest -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: headless-frames
+          path: artifacts/*.png
+          if-no-files-found: warn
