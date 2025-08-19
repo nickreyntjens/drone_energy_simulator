@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 import math
 
+from drone import Drone
+
 # Uncomment to set an interactive backend if needed:
 # import matplotlib
 # matplotlib.use('TkAgg')
@@ -167,52 +169,6 @@ def slow_down(drone, target_speed, dt, simulation_history):
             'speed': current_speed * 3.6,  # km/h
             'acceleration': np.linalg.norm(acc)
         })
-
-# ----------------------- Drone Class -----------------------
-
-class Drone:
-    def __init__(self, position, max_acc, max_speed, battery_capacity, energy_consumption,
-                 laser_shot_energy, low_battery_threshold):
-        self.position = np.array(position, dtype=float)
-        self.velocity = np.array([0.0, 0.0])
-        self.max_acc = max_acc
-        self.max_speed = max_speed
-        self.battery_capacity = battery_capacity   # in Joules
-        self.battery = battery_capacity            # fully charged initially
-        self.energy_consumption = energy_consumption  # J/s
-        self.laser_shot_energy = laser_shot_energy    # energy per shot (J)
-        self.low_battery_threshold = low_battery_threshold
-        self.total_energy_used = 0.0
-        self.total_time = 0.0
-        self.path = [self.position.copy()]
-        self.log = []
-        self.total_recharge_time = 0.0
-        self.recharge_count = 0
-        self.insects_killed_count = 0
-
-    def update(self, acceleration, dt):
-        self.velocity += acceleration * dt
-        speed = np.linalg.norm(self.velocity)
-        if speed > self.max_speed:
-            self.velocity = (self.velocity / speed) * self.max_speed
-        self.position += self.velocity * dt
-        self.path.append(self.position.copy())
-        energy_used = self.energy_consumption * dt
-        self.battery -= energy_used
-        self.total_energy_used += energy_used
-        self.total_time += dt
-
-    def apply_acceleration_towards(self, target, dt):
-        direction = target - self.position
-        dist = np.linalg.norm(direction)
-        if dist == 0:
-            return np.array([0.0, 0.0])
-        desired_velocity = (direction / dist) * self.max_speed
-        required_acc = (desired_velocity - self.velocity) / dt
-        acc_norm = np.linalg.norm(required_acc)
-        if acc_norm > self.max_acc:
-            required_acc = (required_acc / acc_norm) * self.max_acc
-        return required_acc
 
 # ----------------------- Simulation Function (State Machine) -----------------------
 
@@ -386,6 +342,10 @@ drone_params = {
     'max_acc': 1.0,
     'max_speed': 5.0,
     'energy_consumption': 300.0,
+    'mass': 1.5,
+    'drag_coefficient': 1.0,
+    'frontal_area': 0.1,
+    'air_density': 1.225,
     'battery_mAh': 6700.0,
     'num_cells': 3,
     'laser_shot_energy': 1.0,
@@ -440,100 +400,6 @@ time_slider = Slider(ax_slider, 'Flight Time (h)', 0, 1, valinit=0)
 ax_slider.set_visible(False)
 
 insect_count_text = fig.text(0.05, 0.97, "Insect Count: 0", fontsize=12, color='blue')
-
-# ----------------------- Update Simulation View Callback -----------------------
-
-def update_simulation_view(val):
-    """
-    Update the drone marker, flight path, and info box based on the slider's time value.
-    Only the records up to the slider's current time are drawn.
-    """
-    if not simulation_history:
-        return
-    current_time_seconds = time_slider.val * 3600.0
-    idx = min(range(len(simulation_history)), key=lambda i: abs(simulation_history[i]['time'] - current_time_seconds))
-    current_record = simulation_history[idx]
-    # Update drone marker position.
-    pos = current_record['position']
-    drone_marker.set_data(pos[0], pos[1])
-    # Update the flight path up to the current record.
-    path_up_to = np.array([rec['position'] for rec in simulation_history[:idx+1]])
-    if path_up_to.size:
-        drone_path_line.set_data(path_up_to[:, 0], path_up_to[:, 1])
-    # Update the information box with details at this time.
-    info_str = (
-        f"Time: {current_record['time']:.2f} s\n"
-        f"Battery: {current_record['battery']:.2f} J\n"
-        f"Insects killed: {current_record['insects_killed']}\n"
-        f"Recharges: {current_record['recharge_count']}\n"
-        f"Speed: {current_record['speed']:.2f} km/h"
-    )
-    text_out.set_text(info_str)
-    fig.canvas.draw_idle()
-
-# ----------------------- Run Simulation Callback -----------------------
-
-def run_simulation_callback(event):
-    global current_insects, simulation_history, time_slider
-
-    if not current_insects:
-        current_insects = generate_insects(
-            insect_params['field_width'],
-            insect_params['field_height'],
-            insect_params['base_rate'],
-            insect_params['decay_rate'],
-            insect_params['seed']
-        )
-        ix = [i["position"][0] for i in current_insects]
-        iy = [i["position"][1] for i in current_insects]
-        insect_scatter.set_offsets(np.column_stack((ix, iy)))
-        ax_sim.set_xlim(0, insect_params['field_width'])
-        ax_sim.set_ylim(0, insect_params['field_height'])
-        insect_count_text.set_text(f"Insect Count: {len(current_insects)}")
-        fig.canvas.draw_idle()
-    
-    BATTERY_VOLTAGE = drone_params['num_cells'] * 3.7
-    BATTERY_CAPACITY = (drone_params['battery_mAh'] / 1000) * BATTERY_VOLTAGE * 3600
-    LOW_BATTERY_THRESHOLD = BATTERY_CAPACITY * drone_params['low_battery_threshold_fraction']
-    
-    drone = Drone(
-        position=charging_station,
-        max_acc=drone_params['max_acc'],
-        max_speed=drone_params['max_speed'],
-        battery_capacity=BATTERY_CAPACITY,
-        energy_consumption=drone_params['energy_consumption'],
-        laser_shot_energy=drone_params['laser_shot_energy'],
-        low_battery_threshold=LOW_BATTERY_THRESHOLD
-    )
-    
-    active_start_sec = time_to_seconds(environment["active_start"])
-    active_end_sec = time_to_seconds(environment["active_end"])
-    active_period = active_end_sec - active_start_sec
-    
-    simulation_history, log, remaining_insects = simulate(
-        drone, current_insects, np.array(environment["docking_station"]),
-        insect_params['field_width'], insect_params['field_height'],
-        sim_params["dt"],
-        drone_params['lock_time'],
-        sim_params["recharge_time"],
-        drone_params['engagement_range'],
-        drone_params['max_speed_when_shooting_kmh'] / 3.6,
-        active_period,
-        use_fast_tsp=False
-    )
-    
-    if simulation_history:
-        t_min = simulation_history[0]['time'] / 3600.0
-        t_max = simulation_history[-1]['time'] / 3600.0
-        time_slider.ax.clear()
-        time_slider = Slider(time_slider.ax, 'Flight Time (h)', t_min, t_max, valinit=t_min)
-        time_slider.on_changed(update_simulation_view)
-        ax_slider.set_visible(True)
-    
-    drone_path_arr = np.array(drone.path)
-    if drone_path_arr.size:
-        drone_path_line.set_data(drone_path_arr[:, 0], drone_path_arr[:, 1])
-    fig.canvas.draw_idle()
 
 # ----------------------- Configuration Windows -----------------------
 # (These windows remain mostly unchanged.)
@@ -724,7 +590,7 @@ def update_simulation_view(val):
     current_record = simulation_history[idx]
     # Update drone marker
     pos = current_record['position']
-    drone_marker.set_data(pos[0], pos[1])
+    drone_marker.set_data([pos[0]], [pos[1]])
     # Draw path only up to the current simulation record
     path_up_to = np.array([rec['position'] for rec in simulation_history[:idx+1]])
     if path_up_to.size:
@@ -770,7 +636,11 @@ def run_simulation_callback(event):
         battery_capacity=BATTERY_CAPACITY,
         energy_consumption=drone_params['energy_consumption'],
         laser_shot_energy=drone_params['laser_shot_energy'],
-        low_battery_threshold=LOW_BATTERY_THRESHOLD
+        low_battery_threshold=LOW_BATTERY_THRESHOLD,
+        mass=drone_params.get('mass', 1.0),
+        drag_coefficient=drone_params.get('drag_coefficient', 0.0),
+        frontal_area=drone_params.get('frontal_area', 0.0),
+        air_density=drone_params.get('air_density', 1.225)
     )
     
     active_start_sec = time_to_seconds(environment["active_start"])
