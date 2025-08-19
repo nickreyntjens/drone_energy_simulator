@@ -415,7 +415,7 @@ def update_simulation_view(val):
     current_record = simulation_history[idx]
     # Update drone marker position.
     pos = current_record['position']
-    drone_marker.set_data(pos[0], pos[1])
+    drone_marker.set_data([pos[0]], [pos[1]])
     # Update the flight path up to the current record.
     path_up_to = np.array([rec['position'] for rec in simulation_history[:idx+1]])
     if path_up_to.size:
@@ -688,7 +688,7 @@ def update_simulation_view(val):
     current_record = simulation_history[idx]
     # Update drone marker
     pos = current_record['position']
-    drone_marker.set_data(pos[0], pos[1])
+    drone_marker.set_data([pos[0]], [pos[1]])
     # Draw path only up to the current simulation record
     path_up_to = np.array([rec['position'] for rec in simulation_history[:idx+1]])
     if path_up_to.size:
