@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 import math
 
+from drone import Drone
+
 # Uncomment to set an interactive backend if needed:
 # import matplotlib
 # matplotlib.use('TkAgg')
@@ -167,52 +169,6 @@ def slow_down(drone, target_speed, dt, simulation_history):
             'speed': current_speed * 3.6,  # km/h
             'acceleration': np.linalg.norm(acc)
         })
-
-# ----------------------- Drone Class -----------------------
-
-class Drone:
-    def __init__(self, position, max_acc, max_speed, battery_capacity, energy_consumption,
-                 laser_shot_energy, low_battery_threshold):
-        self.position = np.array(position, dtype=float)
-        self.velocity = np.array([0.0, 0.0])
-        self.max_acc = max_acc
-        self.max_speed = max_speed
-        self.battery_capacity = battery_capacity   # in Joules
-        self.battery = battery_capacity            # fully charged initially
-        self.energy_consumption = energy_consumption  # J/s
-        self.laser_shot_energy = laser_shot_energy    # energy per shot (J)
-        self.low_battery_threshold = low_battery_threshold
-        self.total_energy_used = 0.0
-        self.total_time = 0.0
-        self.path = [self.position.copy()]
-        self.log = []
-        self.total_recharge_time = 0.0
-        self.recharge_count = 0
-        self.insects_killed_count = 0
-
-    def update(self, acceleration, dt):
-        self.velocity += acceleration * dt
-        speed = np.linalg.norm(self.velocity)
-        if speed > self.max_speed:
-            self.velocity = (self.velocity / speed) * self.max_speed
-        self.position += self.velocity * dt
-        self.path.append(self.position.copy())
-        energy_used = self.energy_consumption * dt
-        self.battery -= energy_used
-        self.total_energy_used += energy_used
-        self.total_time += dt
-
-    def apply_acceleration_towards(self, target, dt):
-        direction = target - self.position
-        dist = np.linalg.norm(direction)
-        if dist == 0:
-            return np.array([0.0, 0.0])
-        desired_velocity = (direction / dist) * self.max_speed
-        required_acc = (desired_velocity - self.velocity) / dt
-        acc_norm = np.linalg.norm(required_acc)
-        if acc_norm > self.max_acc:
-            required_acc = (required_acc / acc_norm) * self.max_acc
-        return required_acc
 
 # ----------------------- Simulation Function (State Machine) -----------------------
 
@@ -386,6 +342,10 @@ drone_params = {
     'max_acc': 1.0,
     'max_speed': 5.0,
     'energy_consumption': 300.0,
+    'mass': 1.5,
+    'drag_coefficient': 1.0,
+    'frontal_area': 0.1,
+    'air_density': 1.225,
     'battery_mAh': 6700.0,
     'num_cells': 3,
     'laser_shot_energy': 1.0,
@@ -503,7 +463,11 @@ def run_simulation_callback(event):
         battery_capacity=BATTERY_CAPACITY,
         energy_consumption=drone_params['energy_consumption'],
         laser_shot_energy=drone_params['laser_shot_energy'],
-        low_battery_threshold=LOW_BATTERY_THRESHOLD
+        low_battery_threshold=LOW_BATTERY_THRESHOLD,
+        mass=drone_params.get('mass', 1.0),
+        drag_coefficient=drone_params.get('drag_coefficient', 0.0),
+        frontal_area=drone_params.get('frontal_area', 0.0),
+        air_density=drone_params.get('air_density', 1.225)
     )
     
     active_start_sec = time_to_seconds(environment["active_start"])
@@ -770,7 +734,11 @@ def run_simulation_callback(event):
         battery_capacity=BATTERY_CAPACITY,
         energy_consumption=drone_params['energy_consumption'],
         laser_shot_energy=drone_params['laser_shot_energy'],
-        low_battery_threshold=LOW_BATTERY_THRESHOLD
+        low_battery_threshold=LOW_BATTERY_THRESHOLD,
+        mass=drone_params.get('mass', 1.0),
+        drag_coefficient=drone_params.get('drag_coefficient', 0.0),
+        frontal_area=drone_params.get('frontal_area', 0.0),
+        air_density=drone_params.get('air_density', 1.225)
     )
     
     active_start_sec = time_to_seconds(environment["active_start"])
