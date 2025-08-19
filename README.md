@@ -47,14 +47,14 @@ This command will install all necessary packages for your simulation.
 ### 2.1. Saving the Code
 1. **Copy the Full Code:**  
    Copy the entire simulation code into a text editor.
-2. **Save the File:**  
-   Save the file with a name such as `drone_simulation.py`.
+2. **Save the File:**
+   Save the file with a name such as `drone_energy_simulation.py`.
 
 ### 2.2. Executing the Code
 Run the simulation from the terminal:
 
 ```bash
-python drone_simulation.py
+python drone_energy_simulation.py
 ```
 
 When executed, the script opens a graphical user interface (GUI) window with a plotting area, buttons, and sliders.
